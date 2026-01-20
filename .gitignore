@@ -1,0 +1,68 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Kubernetes
+*.kubeconfig
+kubeconfig
+.kube/*
+
+# Helm
+*.tgz
+charts/*/charts
+
+# Multipass
+*.qcow2
+
+# Terraform (if used later)
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Environment files
+.env
+.env.local
+
+# Secrets (never commit)
+*secret*.yaml
+*password*.txt
+
+# Build artifacts
+dist/
+build/
+
+# CI/CD artifacts
+.gitlab-ci-local/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Node
+node_modules/
+package-lock.json
+yarn.lock
+
+# Brain artifacts (planning docs - user requested no superfluous files)
+.gemini/

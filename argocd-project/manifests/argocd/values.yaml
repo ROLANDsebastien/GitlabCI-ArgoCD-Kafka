@@ -1,0 +1,14 @@
+server:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    # Some versions use hostname instead of hosts
+    hostname: argocd.local
+    hosts:
+      - argocd.local
+  extraArgs:
+    - --insecure
+
+configs:
+  params:
+    server.insecure: true

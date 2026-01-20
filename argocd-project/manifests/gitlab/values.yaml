@@ -1,0 +1,72 @@
+global:
+  hosts:
+    domain: gitlab.local
+    gitlab:
+      name: gitlab.local
+    https: false
+  ingress:
+    configureCertmanager: false
+    class: nginx
+    tls:
+      enabled: false
+  identity:
+    issuer: http://gitlab.local
+  minio:
+    enabled: true
+
+installCertmanager: false
+
+nginx-ingress:
+  enabled: false
+
+prometheus:
+  install: false
+
+gitlab:
+  webservice:
+    replicas: 1
+    workerProcesses: 2
+  sidekiq:
+    replicas: 1
+  gitlab-shell:
+    replicas: 1
+
+postgresql:
+  install: true
+  image:
+    tag: 16.3.0
+
+redis:
+  install: true
+
+registry:
+  enabled: false
+
+minio:
+  image: minio/minio
+  imageTag: RELEASE.2024-01-31T20-20-33Z
+
+gitlab-runner:
+  install: true
+  # Use the internal service URL for the runner to register
+  gitlabUrl: http://gitlab-webservice-default.gitlab.svc.cluster.local:8080
+  rbac:
+    create: false  # We create our own RBAC
+  serviceAccount:
+    create: false  # We create our own ServiceAccount
+    name: gitlab-runner
+  runners:
+    privileged: true
+    serviceAccountName: gitlab-runner
+    config: |
+      [[runners]]
+        [runners.kubernetes]
+          helper_image = "registry.gitlab.com/gitlab-org/gitlab-runner/gitlab-runner-helper:arm64-v18.7.2"
+          image = "dtzar/helm-kubectl:latest"
+          privileged = true
+          service_account = "gitlab-runner"
+          namespace = "gitlab"
+        [runners.cache]
+        [runners.custom_build_dir]
+      [runners.tls]
+        insecure_skip_verify = true

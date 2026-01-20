@@ -1,0 +1,23 @@
+stages:
+  - deploy
+
+variables:
+  ARGOCD_NAMESPACE: argocd
+
+deploy-argocd:
+  stage: deploy
+  image: dtzar/helm-kubectl:latest
+  script:
+    - echo "Installing Argo CD..."
+    - helm repo add argo https://argoproj.github.io/argo-helm
+    - helm repo update
+    - kubectl create namespace $ARGOCD_NAMESPACE || true
+    - echo "Deploying ArgoCD with Helm..."
+    - helm upgrade --install argocd argo/argo-cd --namespace $ARGOCD_NAMESPACE -f manifests/argocd/values.yaml
+    - echo "Waiting for ArgoCD to be ready..."
+    - kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n $ARGOCD_NAMESPACE
+    - echo "ArgoCD deployed successfully!"
+    - kubectl get pods -n $ARGOCD_NAMESPACE
+  only:
+    - main
+    - master
