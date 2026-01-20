@@ -48,8 +48,9 @@ push-to-argocd:
     - eval $(ssh-agent -s)
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - printf "%s" "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
+    - wc -l ~/.ssh/id_rsa
     - ssh-add ~/.ssh/id_rsa
     - ssh-keyscan -H gitlab-gitlab-shell.gitlab.svc.cluster.local >> ~/.ssh/known_hosts
     - git config --global user.email "ci@gitlab.local"
