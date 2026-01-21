@@ -108,6 +108,9 @@ echo "Variables configured successfully."
 echo "------------------------------------------------"
 echo "Configuring ArgoCD Repository Secrets..."
 
+# Ensure the namespace exists
+kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+
 # Define the repository secret for internal access
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
