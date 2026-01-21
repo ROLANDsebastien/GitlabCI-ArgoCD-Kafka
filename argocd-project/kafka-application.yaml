@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: http://gitlab.local:30080/root/kafka-project.git
+    repoURL: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/kafka-project.git
     targetRevision: HEAD
     path: manifests
   destination:

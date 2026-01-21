@@ -1,10 +1,54 @@
 stages:
+  - security
   - deploy-operator
   - deploy-kafka
   - deploy-ui
 
 variables:
   KAFKA_NAMESPACE: kafka
+  SNYK_TOKEN: $SNYK_TOKEN
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "api"
+
+snyk-iac-scan:
+  stage: security
+  image: node:20-alpine
+  before_script:
+    - npm install -g snyk
+    - snyk --version
+  script:
+    - echo "Running Snyk IaC scan on Kubernetes manifests..."
+    - snyk iac test manifests --severity-threshold=high --sarif-file-output=snyk-iac.sarif || true
+    - echo "Snyk IaC scan completed"
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+
+snyk-container-scan:
+  stage: security
+  image: docker:latest
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  services:
+    - docker:dind
+  before_script:
+    - apk add --no-cache npm
+    - npm install -g snyk
+    - snyk --version
+  script:
+    - echo "Running Snyk Container scan on CI images..."
+    - snyk container test dtzar/helm-kubectl:latest --severity-threshold=high --sarif-file-output=snyk-container-helm.sarif || true
+    - snyk container test alpine/git:latest --severity-threshold=high --sarif-file-output=snyk-container-git.sarif || true
+    - snyk container test provectuslabs/kafka-ui:latest --severity-threshold=high --sarif-file-output=snyk-container-ui.sarif || true
+    - echo "Snyk Container scans completed"
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
 
 deploy-strimzi-operator:
   stage: deploy-operator
@@ -18,9 +62,8 @@ deploy-strimzi-operator:
     - kubectl wait --for=condition=available --timeout=300s deployment/strimzi-cluster-operator -n $KAFKA_NAMESPACE
     - echo "Deploying Kafka Cluster..."
     - kubectl apply -f manifests/kafka/kafka-kraft.yaml -n $KAFKA_NAMESPACE
-  only:
-    - main
-    - master
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
 
 deploy-kafka-ui:
   stage: deploy-ui
@@ -36,32 +79,38 @@ deploy-kafka-ui:
     - kubectl get pods -n $KAFKA_NAMESPACE
   needs:
     - deploy-strimzi-operator
-  only:
-    - main
-    - master
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
 
 push-to-argocd:
   stage: deploy-ui
   image: alpine/git:latest
-  script:
+  before_script:
+    - echo "Setting up SSH configuration..."
     - apk add --no-cache openssh-client
     - eval $(ssh-agent -s)
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
-    - printf "%s" "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    # Check if SSH_PRIVATE_KEY is set
+    - |
+      if [ -z "$SSH_PRIVATE_KEY" ]; then
+        echo "❌ SSH_PRIVATE_KEY variable is not set!"
+        echo "Please configure SSH_PRIVATE_KEY in GitLab CI/CD variables"
+        exit 1
+      fi
+    # Decode base64-encoded SSH key
+    - echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
-    - wc -l ~/.ssh/id_rsa
+    - echo "SSH key file created with $(wc -l ~/.ssh/id_rsa) lines"
     - ssh-add ~/.ssh/id_rsa
     - ssh-keyscan -H gitlab-gitlab-shell.gitlab.svc.cluster.local >> ~/.ssh/known_hosts
     - git config --global user.email "ci@gitlab.local"
     - git config --global user.name "GitLab CI"
-    # Clone via internal service URL or configured DNS
+  script:
+    - echo "Cloning argocd-project repository..."
     - git clone git@gitlab-gitlab-shell.gitlab.svc.cluster.local:root/argocd-project.git /tmp/argocd-project
-    # Note: SSH usually stays on port 22 unless mapped otherwise, but here we are using HTTP for simplicity if possible.
-    # Actually, the user's config used git@gitlab.local. 
-    # Let's ensure gitlab.local resolves correctly for the runner.
-
     - cd /tmp/argocd-project
+    - echo "Creating Kafka ArgoCD application manifest..."
     - |
       cat > kafka-application.yaml << EOF
       apiVersion: argoproj.io/v1alpha1
@@ -72,7 +121,7 @@ push-to-argocd:
       spec:
         project: default
         source:
-          repoURL: git@gitlab-gitlab-shell.gitlab.svc.cluster.local:root/kafka-project.git
+          repoURL: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/kafka-project.git
           targetRevision: HEAD
           path: manifests
         destination:
@@ -83,11 +132,17 @@ push-to-argocd:
             prune: true
             selfHeal: true
       EOF
+    - echo "Adding and committing Kafka application manifest..."
     - git add kafka-application.yaml
     - git commit -m "Update Kafka application manifest" || echo "No changes to commit"
+    - echo "Pushing to argocd-project repository..."
     - git push origin main
+    - echo "✅ Kafka application successfully registered in ArgoCD!"
+  after_script:
+    - echo "Cleaning up SSH configuration..."
+    - ssh-agent -k || true
+    - rm -rf ~/.ssh
   needs:
     - deploy-kafka-ui
-  only:
-    - main
-    - master
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"

@@ -129,3 +129,10 @@ for PROJECT in "${PROJECTS[@]}"; do
     fi
 done
 
+
+echo "------------------------------------------------"
+echo "Configuring CI/CD variables..."
+"$SCRIPT_DIR/setup-variables.sh"
+
+echo "------------------------------------------------"
+echo "Setup complete!"
