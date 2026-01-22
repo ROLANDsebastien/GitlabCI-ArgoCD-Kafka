@@ -16,13 +16,15 @@ workflow:
 snyk-iac-scan:
   stage: security
   image: node:20-alpine
+  tags: [security-runner]
+  parallel: 2
   before_script:
     - npm install -g snyk
     - snyk --version
   script:
-    - echo "Running Snyk IaC scan on ArgoCD manifests..."
-    - snyk iac test manifests --severity-threshold=high --sarif-file-output=snyk-iac.sarif || true
-    - echo "Snyk IaC scan completed"
+    - echo "Running Snyk IaC scan on ArgoCD manifests - node ${CI_NODE_INDEX}..."
+    - snyk iac test manifests --severity-threshold=high --sarif-file-output=snyk-iac-${CI_NODE_INDEX}.sarif || true
+    - echo "Snyk IaC scan completed on node ${CI_NODE_INDEX}"
   allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
@@ -30,6 +32,8 @@ snyk-iac-scan:
 snyk-container-scan:
   stage: security
   image: docker:latest
+  tags: [security-runner]
+  parallel: 2
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
@@ -40,9 +44,14 @@ snyk-container-scan:
     - npm install -g snyk
     - snyk --version
   script:
-    - echo "Running Snyk Container scan on CI images..."
-    - snyk container test dtzar/helm-kubectl:latest --severity-threshold=high --sarif-file-output=snyk-container.sarif || true
-    - echo "Snyk Container scan completed"
+    - echo "Running Snyk Container scan on CI images - node ${CI_NODE_INDEX}..."
+    - |
+      if [ "$CI_NODE_INDEX" -eq 0 ]; then
+        snyk container test dtzar/helm-kubectl:latest --severity-threshold=high --sarif-file-output=snyk-container-helm.sarif || true
+      else
+        echo "Additional container scans can be added here for node 1"
+      fi
+    - echo "Snyk Container scan completed on node ${CI_NODE_INDEX}"
   allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
@@ -50,6 +59,7 @@ snyk-container-scan:
 deploy-argocd:
   stage: deploy
   image: dtzar/helm-kubectl:latest
+  tags: [deploy-runner]
   script:
     - echo "Installing Argo CD..."
     - helm repo add argo https://argoproj.github.io/argo-helm
@@ -67,6 +77,7 @@ deploy-argocd:
 apply-applications:
   stage: applications
   image: dtzar/helm-kubectl:latest
+  tags: [deploy-runner]
   script:
     - echo "Applying all ArgoCD Application manifests..."
     - |

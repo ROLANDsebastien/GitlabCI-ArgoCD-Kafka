@@ -48,6 +48,7 @@ minio:
 
 gitlab-runner:
   install: true
+  replicas: 2
   # Use the internal service URL for the runner to register
   gitlabUrl: http://gitlab-webservice-default.gitlab.svc.cluster.local:8080
   rbac:
@@ -56,6 +57,7 @@ gitlab-runner:
     create: false  # We create our own ServiceAccount
     name: gitlab-runner
   runners:
+    tags: "security-runner, deploy-runner"
     privileged: true
     serviceAccountName: gitlab-runner
     config: |
