@@ -1,4 +1,4 @@
-yaml:
+yamlApplicationConfig:
   kafka:
     clusters:
       - name: my-cluster

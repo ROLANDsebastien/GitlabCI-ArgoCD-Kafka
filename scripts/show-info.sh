@@ -21,7 +21,7 @@ echo ""
 echo "--- /etc/hosts CONFIGURATION ---"
 echo "Add this to your /etc/hosts file:"
 if [ "$W1_IP" != "N/A" ]; then
-    echo "$W1_IP gitlab.local argocd.local kafka-ui.local"
+    echo "$W1_IP gitlab.local argocd.local kafka-ui.local java-app.local"
 else
     echo "Error: Cannot determine worker IP addresses"
 fi
@@ -83,6 +83,21 @@ if kubectl get ns $KAFKA_NS >/dev/null 2>&1; then
     fi
 else
     echo "Status: Not deployed yet"
+fi
+echo ""
+
+# Java App Info
+echo "--- JAVA APP ---"
+if kubectl get ingress java-app-ingress -n default >/dev/null 2>&1; then
+    echo "URL: http://java-app.local:30080"
+    READY=$(kubectl get pods -n default -l app.kubernetes.io/name=java-app --no-headers 2>/dev/null | grep -c "Running" || true)
+    if [ "$READY" -ge 1 ]; then
+        echo "Status: Running"
+    else
+        echo "Status: Starting up"
+    fi
+else
+    echo "Status: Not deployed or ingress missing"
 fi
 
 echo "===================================================="
