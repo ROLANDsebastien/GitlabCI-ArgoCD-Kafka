@@ -15,16 +15,16 @@ echo "Waiting for VMs..."
 sleep 20
 
 echo "Installing k3s on master (tainted)..."
-multipass exec $MASTER_NAME -- bash -c "curl -sfL https://get.k3s.io | sh -s - --disable=traefik --disable=servicelb --node-taint CriticalAddonsOnly=true:NoExecute"
+multipass exec $MASTER_NAME -- bash -c "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=\"v1.31.5+k3s1\" sh -s - --disable=traefik --disable=servicelb --node-taint CriticalAddonsOnly=true:NoExecute"
 
 MASTER_IP=$(multipass info $MASTER_NAME --format json | jq -r ".info[\"$MASTER_NAME\"].ipv4[0]")
 NODE_TOKEN=$(multipass exec $MASTER_NAME -- sudo cat /var/lib/rancher/k3s/server/node-token)
 
 echo "Joining worker 1..."
-multipass exec $W1_NAME -- bash -c "curl -sfL https://get.k3s.io | K3S_URL=https://$MASTER_IP:6443 K3S_TOKEN=$NODE_TOKEN sh -"
+multipass exec $W1_NAME -- bash -c "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=\"v1.31.5+k3s1\" K3S_URL=https://$MASTER_IP:6443 K3S_TOKEN=$NODE_TOKEN sh -"
 
 echo "Joining worker 2..."
-multipass exec $W2_NAME -- bash -c "curl -sfL https://get.k3s.io | K3S_URL=https://$MASTER_IP:6443 K3S_TOKEN=$NODE_TOKEN sh -"
+multipass exec $W2_NAME -- bash -c "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=\"v1.31.5+k3s1\" K3S_URL=https://$MASTER_IP:6443 K3S_TOKEN=$NODE_TOKEN sh -"
 
 echo "Configuring kubeconfig..."
 mkdir -p ~/.kube
@@ -43,6 +43,7 @@ kubectl create namespace ingress-nginx || true
 
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   --namespace ingress-nginx \
+  --version 4.11.3 \
   --set controller.service.type=NodePort \
   --set controller.service.nodePorts.http=30080 \
   --set controller.service.nodePorts.https=30443 \
