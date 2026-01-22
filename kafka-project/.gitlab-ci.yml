@@ -8,6 +8,12 @@ variables:
   KAFKA_NAMESPACE: kafka
   SNYK_TOKEN: $SNYK_TOKEN
 
+default:
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .npm/
+
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "push"
@@ -18,14 +24,14 @@ snyk-iac-scan:
   stage: security
   image: node:20.17.0-alpine
   tags: [security-runner]
-  parallel: 2
   before_script:
+    - npm config set cache .npm
     - npm install -g snyk
     - snyk --version
   script:
     - echo "Running Snyk IaC scan on Kubernetes manifests..."
-    - snyk iac test manifests --severity-threshold=high --sarif-file-output=snyk-iac-${CI_NODE_INDEX}.sarif || true
-    - echo "Snyk IaC scan completed on node ${CI_NODE_INDEX}"
+    - snyk iac test manifests --severity-threshold=high --sarif-file-output=snyk-iac.sarif || true
+    - echo "Snyk IaC scan completed"
   allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
@@ -34,7 +40,6 @@ snyk-container-scan:
   stage: security
   image: docker:27.2.1
   tags: [security-runner]
-  parallel: 2
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
@@ -42,18 +47,15 @@ snyk-container-scan:
     - docker:27.2.1-dind
   before_script:
     - apk add --no-cache npm
+    - npm config set cache .npm
     - npm install -g snyk
     - snyk --version
   script:
-    - echo "Running Snyk Container scan on CI images - node ${CI_NODE_INDEX}..."
-    - |
-      if [ "$CI_NODE_INDEX" -eq 0 ]; then
-        snyk container test dtzar/helm-kubectl:3.16.1 --severity-threshold=high --sarif-file-output=snyk-container-helm.sarif || true
-        snyk container test alpine/git:2.45.2 --severity-threshold=high --sarif-file-output=snyk-container-git.sarif || true
-      else
-        snyk container test provectuslabs/kafka-ui:0.7.2 --severity-threshold=high --sarif-file-output=snyk-container-ui.sarif || true
-      fi
-    - echo "Snyk Container scans completed on node ${CI_NODE_INDEX}"
+    - echo "Running Snyk Container scan on CI images..."
+    - snyk container test dtzar/helm-kubectl:3.16.1 --severity-threshold=high --sarif-file-output=snyk-container-helm.sarif || true
+    - snyk container test alpine/git:2.45.2 --severity-threshold=high --sarif-file-output=snyk-container-git.sarif || true
+    - snyk container test provectuslabs/kafka-ui:0.7.2 --severity-threshold=high --sarif-file-output=snyk-container-ui.sarif || true
+    - echo "Snyk Container scans completed"
   allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
@@ -62,6 +64,7 @@ deploy-strimzi-operator:
   stage: deploy-operator
   image: dtzar/helm-kubectl:3.16.1
   tags: [deploy-runner]
+  needs: []  # Start immediately, don't wait for security stage
   script:
     - echo "Installing Strimzi Operator..."
     - kubectl create namespace $KAFKA_NAMESPACE || true
@@ -80,7 +83,7 @@ deploy-kafka-ui:
   tags: [deploy-runner]
   script:
     - echo "Deploying Kafka UI..."
-    - helm repo add kafka-ui https://provectus.github.io/kafka-ui-charts
+    - helm repo add kafka-ui https://provectus.github.io/kafka-ui-charts || true
     - helm repo update
     - helm upgrade --install kafka-ui kafka-ui/kafka-ui --namespace $KAFKA_NAMESPACE --version 0.7.2 -f manifests/kafka/kafka-ui-values.yaml
     - echo "Applying Kafka UI Ingress..."
