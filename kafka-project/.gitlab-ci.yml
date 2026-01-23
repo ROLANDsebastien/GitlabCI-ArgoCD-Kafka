@@ -69,7 +69,7 @@ deploy-strimzi-operator:
     - echo "Installing Strimzi Operator..."
     - kubectl create namespace $KAFKA_NAMESPACE || true
     # Apply Strimzi install file directly from upstream
-    - kubectl apply -f "https://strimzi.io/install/0.44.0?namespace=$KAFKA_NAMESPACE" -n $KAFKA_NAMESPACE
+    - kubectl apply -f "https://strimzi.io/install/latest?namespace=$KAFKA_NAMESPACE" -n $KAFKA_NAMESPACE
     - echo "Waiting for Strimzi Operator..."
     - kubectl wait --for=condition=available --timeout=300s deployment/strimzi-cluster-operator -n $KAFKA_NAMESPACE
     - echo "Deploying Kafka Cluster..."

@@ -53,13 +53,14 @@ gitlab-runner:
   replicas: 2
   # Use the internal service URL for the runner to register
   gitlabUrl: http://gitlab-webservice-default.gitlab.svc.cluster.local:8080
-  runnerRegistrationToken: "ngRewSxAsxfs-LwHESp-"
+  runnerRegistrationToken: "" # Disable auto-creation of default secret
   rbac:
     create: false  # We create our own RBAC
   serviceAccount:
     create: false  # We create our own ServiceAccount
     name: gitlab-runner
   runners:
+    secret: gitlab-runner-secret-v2 # Use our custom secret
     tags: "security-runner,deploy-runner"
     privileged: true
     serviceAccountName: gitlab-runner

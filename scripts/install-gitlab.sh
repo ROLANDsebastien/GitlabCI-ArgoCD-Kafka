@@ -8,43 +8,29 @@ echo "Installing GitLab..."
 helm repo add gitlab https://charts.gitlab.io
 helm repo update
 
-kubectl create namespace $NAMESPACE || true
+# Ensure clean slate
+echo "Cleaning up any existing installation..."
+helm uninstall gitlab -n $NAMESPACE --wait 2>/dev/null || true
+kubectl delete secret gitlab-gitlab-runner-secret -n $NAMESPACE --ignore-not-found --wait=true
+kubectl delete secret gitlab-runner-secret-v2 -n $NAMESPACE --ignore-not-found --wait=true
+kubectl delete namespace $NAMESPACE --ignore-not-found --wait=true
 
-echo "Cleaning up potential runner secret conflicts..."
-# Uninstall failed release if exists to clean up owned resources
-helm uninstall gitlab -n $NAMESPACE --wait || true
+# Recreate namespace fresh
+echo "Creating namespace..."
+kubectl create namespace $NAMESPACE
+kubectl label namespace $NAMESPACE istio-injection=disabled --overwrite
 
-# Explicitly delete the conflicting secret and wait for it to be gone
-kubectl delete secret gitlab-gitlab-runner-secret -n $NAMESPACE --ignore-not-found || true
-
-echo "Waiting for secret to be fully deleted..."
-while kubectl get secret gitlab-gitlab-runner-secret -n $NAMESPACE >/dev/null 2>&1; do
-  echo "Secret still exists, waiting..."
-  sleep 2
-done
-
-echo "Manually creating runner secret with Helm metadata..."
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: gitlab-gitlab-runner-secret
-  namespace: $NAMESPACE
-  labels:
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    meta.helm.sh/release-name: gitlab
-    meta.helm.sh/release-namespace: $NAMESPACE
-type: Opaque
-stringData:
-  runner-registration-token: "ngRewSxAsxfs-LwHESp-"
-  runner-token: ""
-EOF
+echo "Creating custom runner secret (v2)..."
+kubectl create secret generic gitlab-runner-secret-v2 \
+  --namespace $NAMESPACE \
+  --from-literal=runner-registration-token="ngRewSxAsxfs-LwHESp-" \
+  --from-literal=runner-token=""
 
 echo "Applying GitLab Runner RBAC..."
 kubectl apply -f "$MANIFEST_DIR/../gitlab-runner/rbac.yaml"
 
 echo "Installing GitLab Chart..."
+# Rely entirely on values.yaml for secret creation to avoid conflicts
 helm upgrade --install gitlab gitlab/gitlab \
   --namespace $NAMESPACE \
   --timeout 600s \
