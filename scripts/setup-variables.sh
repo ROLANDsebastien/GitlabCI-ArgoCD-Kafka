@@ -5,7 +5,7 @@ set -e
 GITLAB_URL="http://gitlab.local:30080"
 # Use environment variable if present, otherwise fallback to default
 PERSONAL_ACCESS_TOKEN="${GITLAB_PAT:-glpat-BootstrapAutoToken99}"
-PROJECTS=("argocd-project" "kafka-project")
+PROJECTS=("argocd-project" "kafka-project" "gatus-project")
 
 # Snyk Token - User should provide this or we use a placeholder for now
 if [ -z "$SNYK_TOKEN" ]; then
@@ -96,7 +96,7 @@ for PROJECT in "${PROJECTS[@]}"; do
     set_variable "$PROJECT_ID" "SNYK_TOKEN" "$SNYK_TOKEN" false true
     
     # Set SSH_PRIVATE_KEY for kafka-project to allow it to push to argocd-project
-    if [ "$PROJECT" == "kafka-project" ] && [ -n "$SSH_PRIVATE_KEY" ]; then
+    if [[ "$PROJECT" == "kafka-project" || "$PROJECT" == "gatus-project" ]] && [ -n "$SSH_PRIVATE_KEY" ]; then
         # Encode SSH key in base64 to avoid JSON escaping issues
         SSH_PRIVATE_KEY_B64=$(echo "$SSH_PRIVATE_KEY" | base64)
         set_variable "$PROJECT_ID" "SSH_PRIVATE_KEY" "$SSH_PRIVATE_KEY_B64" false false
