@@ -1,0 +1,55 @@
+persistence:
+  enabled: true
+  size: 500Mi
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false # We use a manual ingress to ensure control over host/class
+
+config:
+  endpoints:
+    - name: "GitLab"
+      group: "Infrastructure"
+      url: "http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/users/sign_in"
+      interval: 1m
+      conditions:
+        - "[STATUS] == 200"
+      alerts:
+        - type: slack
+          enabled: false 
+          description: "GitLab is down!"
+
+    - name: "Argo CD"
+      group: "Infrastructure"
+      url: "http://argocd-server.argocd.svc.cluster.local"
+      interval: 1m
+      conditions:
+        - "[STATUS] == 200"
+      alerts:
+        - type: slack
+          enabled: false
+
+    - name: "Kafka UI"
+      group: "Data Streaming"
+      url: "http://kafka-ui.kafka.svc.cluster.local"
+      interval: 1m
+      conditions:
+        - "[STATUS] == 200"
+    
+    - name: "Kafka Broker"
+      group: "Data Streaming"
+      url: "tcp://my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
+      interval: 30s
+      conditions:
+        - "[CONNECTED] == true"
+
+    - name: "Java App"
+      group: "Applications"
+      url: "http://java-app.default.svc.cluster.local:8080/actuator/health"
+      interval: 30s
+      conditions:
+        - "[STATUS] == 200"
+        - "[BODY].status == UP"

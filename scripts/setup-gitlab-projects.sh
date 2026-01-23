@@ -8,7 +8,7 @@ TOKEN_NAME="bootstrap-automation-token"
 # Use environment variable if present, otherwise fallback to default
 PERSONAL_ACCESS_TOKEN="${GITLAB_PAT:-glpat-BootstrapAutoToken99}"
 SSH_KEY_PATH="$HOME/.ssh/id_rsa.pub"
-PROJECTS=("argocd-project" "kafka-project")
+PROJECTS=("argocd-project" "kafka-project" "gatus-project")
 
 # Root directory detection (one level up from scripts/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

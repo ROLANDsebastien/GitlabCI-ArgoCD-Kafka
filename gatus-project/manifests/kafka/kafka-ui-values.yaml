@@ -1,0 +1,7 @@
+yamlApplicationConfig:
+  kafka:
+    clusters:
+      - name: my-cluster
+        bootstrapServers: my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
+ingress:
+  enabled: false # We use the manual ingress

@@ -1,0 +1,117 @@
+stages:
+  - security
+  - deploy
+
+variables:
+  GATUS_NAMESPACE: gatus
+  SNYK_TOKEN: $SNYK_TOKEN
+
+default:
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .npm/
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "api"
+
+snyk-iac-scan:
+  stage: security
+  image: node:20.17.0-alpine
+  tags: [security-runner]
+  before_script:
+    - npm config set cache .npm
+    - npm install -g snyk
+    - snyk --version
+  script:
+    - echo "Running Snyk IaC scan on Kubernetes manifests..."
+    - snyk iac test manifests --severity-threshold=high --sarif-file-output=snyk-iac.sarif || true
+    - echo "Snyk IaC scan completed"
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+
+deploy-gatus:
+  stage: deploy
+  image: dtzar/helm-kubectl:3.16.1
+  tags: [deploy-runner]
+  script:
+    - echo "Deploying Gatus..."
+    - kubectl create namespace $GATUS_NAMESPACE || true
+    - helm repo add gatus https://twin.github.io/helm-charts || true
+    - helm repo update
+    - echo "Installing Gatus via Helm..."
+    - helm upgrade --install gatus gatus/gatus --namespace $GATUS_NAMESPACE -f manifests/gatus/values.yaml
+    - echo "Applying Ingress..."
+    - kubectl apply -f manifests/gatus/ingress.yaml
+    - echo "Gatus deployed successfully!"
+    - kubectl get pods -n $GATUS_NAMESPACE
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+
+push-to-argocd:
+  stage: deploy
+  image: alpine/git:2.45.2
+  tags: [deploy-runner]
+  needs: ["deploy-gatus"]
+  before_script:
+    - echo "Setting up SSH configuration..."
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    # Check if SSH_PRIVATE_KEY is set
+    - |
+      if [ -z "$SSH_PRIVATE_KEY" ]; then
+        echo "❌ SSH_PRIVATE_KEY variable is not set!"
+        echo "Please configure SSH_PRIVATE_KEY in GitLab CI/CD variables"
+        exit 1
+      fi
+    # Decode base64-encoded SSH key
+    - echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-add ~/.ssh/id_rsa
+    - ssh-keyscan -H gitlab-gitlab-shell.gitlab.svc.cluster.local >> ~/.ssh/known_hosts
+    - git config --global user.email "ci@gitlab.local"
+    - git config --global user.name "GitLab CI"
+  script:
+    - echo "Cloning argocd-project repository..."
+    - git clone git@gitlab-gitlab-shell.gitlab.svc.cluster.local:root/argocd-project.git /tmp/argocd-project
+    - cd /tmp/argocd-project
+    - echo "Creating Gatus ArgoCD application manifest..."
+    - |
+      cat > gatus-application.yaml << EOF
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: gatus
+        namespace: argocd
+      spec:
+        project: default
+        source:
+          repoURL: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/gatus-project.git
+          targetRevision: HEAD
+          path: manifests/gatus
+        destination:
+          server: https://kubernetes.default.svc
+          namespace: gatus
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+      EOF
+    - echo "Adding and committing Gatus application manifest..."
+    - git add gatus-application.yaml
+    - git commit -m "Update Gatus application manifest" || echo "No changes to commit"
+    - echo "Pushing to argocd-project repository..."
+    - git push origin main
+    - echo "✅ Gatus application successfully registered in ArgoCD!"
+  after_script:
+    - echo "Cleaning up SSH configuration..."
+    - ssh-agent -k || true
+    - rm -rf ~/.ssh
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"

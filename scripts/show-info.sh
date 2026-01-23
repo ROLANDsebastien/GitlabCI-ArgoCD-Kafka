@@ -4,6 +4,7 @@
 GITLAB_NS="gitlab"
 ARGOCD_NS="argocd"
 KAFKA_NS="kafka"
+GATUS_NS="gatus"
 
 echo "===================================================="
 echo "         CLUSTER ACCESS INFORMATION"
@@ -21,7 +22,7 @@ echo ""
 echo "--- /etc/hosts CONFIGURATION ---"
 echo "Add this to your /etc/hosts file:"
 if [ "$W1_IP" != "N/A" ]; then
-    echo "$W1_IP gitlab.local argocd.local kafka-ui.local java-app.local"
+    echo "$W1_IP gitlab.local argocd.local kafka-ui.local java-app.local gatus.local"
 else
     echo "Error: Cannot determine worker IP addresses"
 fi
@@ -99,6 +100,24 @@ if kubectl get ingress java-app-ingress -n default >/dev/null 2>&1; then
 else
     echo "Status: Not deployed or ingress missing"
 fi
+echo ""
+
+# Gatus Info
+echo "--- GATUS ---"
+if kubectl get ns $GATUS_NS >/dev/null 2>&1; then
+    echo "URL: http://gatus.local:30080"
+    
+    # Check status
+    STATUS=$(kubectl get pods -n $GATUS_NS -l app.kubernetes.io/name=gatus --no-headers 2>/dev/null | grep -c "Running" || true)
+    if [ "$STATUS" -ge 1 ]; then
+        echo "Status: Running"
+    else
+        echo "Status: Starting up"
+    fi
+else
+    echo "Status: Not deployed yet"
+fi
+echo ""
 
 echo "===================================================="
 echo ""

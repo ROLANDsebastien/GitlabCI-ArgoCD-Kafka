@@ -11,10 +11,10 @@ echo "Creating master VM..."
 multipass launch --name $MASTER_NAME --cpus 1 --memory 2G --disk 10G
 
 echo "Creating worker 1 VM..."
-multipass launch --name $W1_NAME --cpus 4 --memory 7G --disk 20G
+multipass launch --name $W1_NAME --cpus 4 --memory 8G --disk 20G
 
 echo "Creating worker 2 VM..."
-multipass launch --name $W2_NAME --cpus 4 --memory 7G --disk 20G
+multipass launch --name $W2_NAME --cpus 4 --memory 8G --disk 20G
 
 echo "All VMs created successfully!"
 

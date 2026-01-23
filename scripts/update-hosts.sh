@@ -2,7 +2,7 @@
 
 # Only runs on local dev environment (macOS/Linux)
 if [[ "$OSTYPE" == "darwin"* ]] || [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    DOMAINS="gitlab.local argocd.local kafka-ui.local dashboard.local java-app.local"
+    DOMAINS="gitlab.local argocd.local kafka-ui.local dashboard.local java-app.local gatus.local"
     
     echo "Updating /etc/hosts (requires sudo)..."
     
